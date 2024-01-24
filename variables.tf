@@ -23,8 +23,14 @@ variable "github_repo_owner" {
   default = "AhmerKh"
 }
 variable "github_repo_name" {
-  default = "terraform-ecs-codepipeline-pipe-demo"
+  default = "learning"
 }
 variable "github_branch" {
   default = "main"
+}
+
+variable "db_cred" {
+  default = {  "username" : "foo",
+  "password" : "foobarbaz"
+}
 }

@@ -4,10 +4,10 @@ resource "aws_codepipeline" "codepipeline" {
   artifact_store {
     location = aws_s3_bucket.codepipeline_bucket.bucket
     type     = "S3"
-    encryption_key {
-      id   = data.aws_kms_alias.s3kmskey.arn
-      type = "KMS"
-    }
+    # encryption_key {
+    #   id   = data.aws_kms_alias.s3kmskey.arn
+    #   type = "KMS"
+    # }
   }
   stage {
     name = "Source"
@@ -20,7 +20,7 @@ resource "aws_codepipeline" "codepipeline" {
       output_artifacts = ["source_output"]
       configuration = {
         ConnectionArn    = aws_codestarconnections_connection.example.arn
-        FullRepositoryId = "${var.github_repo_owner}/${var.github_repo_name}"  ## Github Access ??
+        FullRepositoryId = "${var.github_repo_owner}/${var.github_repo_name}" ## Github Access ??
         BranchName       = var.github_branch
       }
     }
@@ -48,12 +48,12 @@ resource "aws_codestarconnections_connection" "example" {
 resource "aws_s3_bucket" "codepipeline_bucket" {
   bucket = "pipe-codepipeline-bucket"
 }
-resource "aws_s3_bucket_acl" "codepipeline_bucket_acl" {
-  bucket = aws_s3_bucket.codepipeline_bucket.id
-  acl    = "private"
-}
+# resource "aws_s3_bucket_acl" "codepipeline_bucket_acl" {
+#   bucket = aws_s3_bucket.codepipeline_bucket.id
+#   acl    = "private"
+# }
 resource "aws_iam_role" "codepipeline_role" {
-  name = "pipe_codepipeline_role"
+  name               = "pipe_codepipeline_role"
   assume_role_policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -71,8 +71,8 @@ resource "aws_iam_role" "codepipeline_role" {
 EOF
 }
 resource "aws_iam_role_policy" "codepipeline_policy" {
-  name = "pipe_codepipeline_policy"
-  role = aws_iam_role.codepipeline_role.id
+  name   = "pipe_codepipeline_policy"
+  role   = aws_iam_role.codepipeline_role.id
   policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -113,7 +113,7 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
       "Effect": "Allow",
       "Action": [
         "cloudformation:DescribeStacks",
-        "kms:GenerateDataKey",
+        
         "iam:GetRole",
         "iam:PassRole"
       ],
@@ -123,6 +123,7 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
 }
 EOF
 }
+# "kms:GenerateDataKey",
 resource "aws_codebuild_project" "pipe" {
   name          = "pipe-app-demo"
   description   = "Builds a pipe application"
@@ -132,10 +133,10 @@ resource "aws_codebuild_project" "pipe" {
     type = "CODEPIPELINE"
   }
   environment {
-    compute_type    = "BUILD_GENERAL1_SMALL"                      ## t2micro ???
+    compute_type    = "BUILD_GENERAL1_SMALL" ## t2micro ???
     image           = "aws/codebuild/standard:2.0"
     type            = "LINUX_CONTAINER"
-    privileged_mode = true                                         ## ???
+    privileged_mode = true ## ???
     environment_variable {
       name  = "AWS_ACCOUNT_ID"
       value = var.aws_account_id
@@ -171,7 +172,7 @@ resource "aws_codebuild_project" "pipe" {
   }
 }
 resource "aws_iam_role" "codebuild_role" {
-  name = "pipe_codebuild_role"
+  name               = "pipe_codebuild_role"
   assume_role_policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -189,8 +190,8 @@ resource "aws_iam_role" "codebuild_role" {
 EOF
 }
 resource "aws_iam_role_policy" "codebuild_policy" {
-  name = "pipe_codebuild_policy"
-  role = aws_iam_role.codebuild_role.id
+  name   = "pipe_codebuild_policy"
+  role   = aws_iam_role.codebuild_role.id
   policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -245,6 +246,8 @@ resource "aws_iam_role_policy" "codebuild_policy" {
 }
 EOF
 }
-data "aws_kms_alias" "s3kmskey" {
-  name = "alias/pipe_app_s3kmskey"
-}
+
+
+# data "aws_kms_alias" "s3kmskey" {
+#   name = "alias/pipe_app_s3kmskey"
+# }

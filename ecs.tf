@@ -26,6 +26,10 @@ resource "aws_default_subnet" "default_subnet_a" {
   availability_zone = "us-east-1a"
 }
 
+resource "aws_default_subnet" "default_subnet_b" {
+  # Use your own region here but reference to subnet 1a
+  availability_zone = "us-east-1b"
+}
 
 
 #Create ECR using terraform
@@ -49,6 +53,17 @@ resource "aws_ecs_task_definition" "app_task" {
       "name": "app-first-task",
       "image": "${aws_ecr_repository.app_ecr_repo.repository_url}",
       "essential": true,
+      "environment" : [
+              { "name": "DB_HOST", "value": "${data.aws_db_instance.rds.address}" },
+              { "name": "DB_PORT", "value": "${data.aws_db_instance.rds.port}" },
+              { "name": "DB_DATABASE", "value": "${data.aws_db_instance.rds.db_name}" },
+              { "name": "DB_USERNAME", "value": "${var.db_cred.username}" },
+              { "name": "DB_PASSWORD", "value": "${var.db_cred.password}" }
+      ],
+
+
+      
+
       "portMappings": [
         {
           "containerPort": 3000,
@@ -56,7 +71,20 @@ resource "aws_ecs_task_definition" "app_task" {
         }
       ],
       "memory": 512,
-      "cpu": 256
+      "cpu": 256,
+
+       "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/app-first-task",
+                    "awslogs-region": "us-east-1",
+                    "awslogs-create-group": "true",
+                    "awslogs-stream-prefix": "ecs"
+                }
+            }
+
+
+
     }
   ]
   DEFINITION
@@ -64,20 +92,35 @@ resource "aws_ecs_task_definition" "app_task" {
   network_mode             = "awsvpc"    # add the AWS VPN network mode as this is required for Fargate
   memory                   = 512         # Specify the memory the container requires
   cpu                      = 256         # Specify the CPU the container requires
-  execution_role_arn       = "${aws_iam_role.ecsTaskExecutionRole.arn}"
+    runtime_platform {
+    operating_system_family = "LINUX"
+    cpu_architecture        = "ARM64"
+  }
+  execution_role_arn       = aws_iam_role.ecsTaskExecutionRole.arn
+  task_role_arn = aws_iam_role.ecsTaskExecutionRole.arn
 }
 
 
+# "environment" : [
+#               { "name": "DB_HOST", "value": "data.aws_db_instance.rds.endpoint" },
+#               { "name": "DB_PORT", "value": "data.aws_db_instance.rds.port" },
+#               { "name": "DB_NAME", "value": "data.aws_db_instance.rds.name" },
+#               { "name": "DB_USER", "value": "data.aws_db_instance.rds.username" },
+#               { "name": "DB_PASSWORD", "value": "data.aws_db_instance.rds.password" }
+#       ],
+
+
+
 resource "aws_ecs_service" "app_service" {
-  name            = "app-first-service"     # Name the service
-  cluster         = "${aws_ecs_cluster.my_cluster.id}"   # Reference the created Cluster
-  task_definition = "${aws_ecs_task_definition.app_task.arn}" # Reference the task that the service will spin up
+  name            = "app-first-service"                  # Name the service
+  cluster         = aws_ecs_cluster.my_cluster.id        # Reference the created Cluster
+  task_definition = aws_ecs_task_definition.app_task.arn # Reference the task that the service will spin up
   launch_type     = "FARGATE"
   desired_count   = 1 # Set up the number of containers to 3
 
-    network_configuration {
+  network_configuration {
     subnets          = ["${aws_default_subnet.default_subnet_a.id}"]
-    assign_public_ip = true     # Provide the containers with public IPs
+    assign_public_ip = true                                                # Provide the containers with public IPs
     security_groups  = ["${aws_security_group.service_security_group.id}"] # Set up the security group
   }
 }
@@ -85,9 +128,9 @@ resource "aws_ecs_service" "app_service" {
 # Security group (Internet => ESC Cluster)
 resource "aws_security_group" "service_security_group" {
   ingress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
     # Only allowing traffic in from the load balancer security group
     #security_groups = ["${aws_security_group.load_balancer_security_group.id}"]
@@ -115,11 +158,33 @@ data "aws_iam_policy_document" "assume_role_policy" {
   statement {
     actions = ["sts:AssumeRole"]
 
+
     principals {
       type        = "Service"
       identifiers = ["ecs-tasks.amazonaws.com"]
     }
   }
+}
+
+resource "aws_iam_role_policy" "ecsTaskExecutionRole" {
+  name   = "ecsTaskExecutionRole"
+  role   = aws_iam_role.ecsTaskExecutionRole.name
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:*:*:*",
+      "Effect": "Allow"
+    }
+  ]
+}
+EOF
 }
 
 resource "aws_iam_role_policy_attachment" "ecsTaskExecutionRole_policy" {
