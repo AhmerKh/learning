@@ -23,7 +23,7 @@ variable "github_repo_owner" {
   default = "AhmerKh"
 }
 variable "github_repo_name" {
-  default = "learning"
+  default = "Hellowithrds"
 }
 variable "github_branch" {
   default = "main"
